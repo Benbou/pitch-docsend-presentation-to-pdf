@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Pitch & DocSend Presentation to PDF",
+  "version": "0.0.0.1",
+  "description": "Export presentations from Pitch.com and DocSend as a PDF by capturing each slide.",
+  "permissions": ["activeTab", "downloads", "tabs"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon48.png"
+    },
+    "matches": ["https://*.pitch.com/*"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.pitch.com/*"],
+      "js": ["jspdf.min.js", "content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon48.png"
+  }
+}

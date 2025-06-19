@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pitch Presentation Exporter</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Pitch.com to PDF</h1>
+      <div id="instructions" style="display: none">
+        <p class="important">
+          Please navigate to the first slide of the presentation, then click
+          export.
+        </p>
+        <p>
+          Make sure your browser window is taking up your entire screen to
+          ensure the best quality export!
+        </p>
+        <button id="exportBtn">Export</button>
+      </div>
+      <div id="statusMessage" style="display: none"></div>
+      <div id="inactiveMessage" style="display: none">
+        <h3>This extension only works on pitch.com.</h3>
+      </div>
+      <div id="footer">
+        <p>made by <a target="_blank" href="https://nicoalbanese.com">Nico Albanese</a></p>
+        <p id="gpt">with a little bit of help from GPT-4 &#128521</p>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
