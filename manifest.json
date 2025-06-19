@@ -8,18 +8,23 @@
     "default_popup": "popup.html",
     "default_icon": {
       "48": "icon48.png"
-    },
-    "matches": ["https://*.pitch.com/*"]
-  },
-  "content_scripts": [
-    {
-      "matches": ["*://*.pitch.com/*"],
-      "js": ["jspdf.min.js", "content.js"]
     }
-  ],
+  },
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.pitch.com/*",
+        "https://*.docsend.com/*"
+      ],
+      "js": [
+        "jspdf.min.js",
+        "content.js"
+      ]
+    }
+  ],
   "icons": {
     "48": "icon48.png"
   }

@@ -1,4 +1,4 @@
-# A Chrome extension to download Pitch.com and Docsend.com slides as a PDF.
+# A Chrome extension to download Pitch.com slides as a PDF.
 
 
 ## How to install
@@ -9,3 +9,7 @@
 
 ## Usage
 Navigate to any Pitch.com slide deck page and click on the extension icon on the top right of Google Chrome. Navigate to the first slide and click export. Done 😊
+
+## Changes
+- Added data URL validation before adding images to the PDF.
+- Added a check to skip invalid images before adding them to the PDF.

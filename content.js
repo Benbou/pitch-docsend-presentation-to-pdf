@@ -18,10 +18,45 @@ async function goToFirstSlideDocSend() {
   if (!prevButton || !currentSlideEl) throw new Error('Prev button or current slide element not found.');
   // Click prev until on first slide
   while (parseInt(currentSlideEl.textContent, 10) > 1) {
+    if (prevButton.style.opacity === '0' || prevButton.style.display === 'none') break;
     prevButton.click();
     // Wait for slide to update
     await new Promise(resolve => setTimeout(resolve, 400));
   }
+}
+
+async function waitForSlideNumber(target, getCurrentSlideIndex, el) {
+  return new Promise(resolve => {
+    // Fast path: already at target
+    if (getCurrentSlideIndex() === target) {
+      resolve();
+      return;
+    }
+    // Observe text changes
+    const observer = new MutationObserver(() => {
+      if (getCurrentSlideIndex() === target) {
+        observer.disconnect();
+        clearInterval(interval);
+        resolve();
+      }
+    });
+    observer.observe(el, { childList: true, subtree: true, characterData: true });
+    // Fallback: poll every 100ms in case observer misses it
+    const interval = setInterval(() => {
+      if (getCurrentSlideIndex() === target) {
+        clearInterval(interval);
+        observer.disconnect();
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+function realClick(element) {
+  if (!element) return;
+  element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
 
 // DocSend-adapted slide capture
@@ -29,84 +64,84 @@ async function captureSlides() {
   const platform = getPlatform();
   if (!platform) throw new Error('Unsupported site. Only Pitch.com and DocSend are supported.');
 
-  let totalSlides, nextButton, getCurrentSlideIndex;
-
   if (platform === 'pitch') {
-    // Pitch.com selectors
     const slideCountElement = document.querySelector('.player-v2-chrome-controls-slide-count');
-    if (!slideCountElement) throw new Error('Slide count element not found.');
-    totalSlides = parseInt(slideCountElement.textContent.split(' / ')[1]);
-    if (isNaN(totalSlides)) throw new Error('Could not parse total slides.');
-    nextButton = document.querySelector('.player-v2--button[aria-label="next"]');
-    if (!nextButton) throw new Error('Next button not found.');
-    getCurrentSlideIndex = () => {
-      const text = slideCountElement.textContent;
-      return parseInt(text.split(' / ')[0], 10);
-    };
+    const totalSlides = parseInt(slideCountElement.textContent.split(' / ')[1]);
+    const nextButton = document.querySelector('.player-v2--button[aria-label="next"]');
+    const slideImages = [];
+    for (let i = 0; i < totalSlides; i++) {
+      const dataUrl = await new Promise((resolve) => {
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: 'captureTab' }, (dataUrl) => {
+            resolve(dataUrl);
+          });
+        }, 1000);
+      });
+      if (dataUrl) {
+        slideImages.push(dataUrl);
+      } else {
+        console.warn('Screenshot failed, skipping this slide.');
+      }
+      if (i < totalSlides - 1) {
+        nextButton.click();
+      }
+    }
+    return slideImages;
   } else if (platform === 'docsend') {
-    // DocSend selectors
     const slideCountElement = document.querySelector('.toolbar-page-indicator');
     if (!slideCountElement) throw new Error('Slide count element not found.');
     const currentSlideEl = document.getElementById('page-number');
     if (!currentSlideEl) throw new Error('Current slide element not found.');
     const match = slideCountElement.textContent.match(/\d+\s*\/\s*(\d+)/);
     if (!match) throw new Error('Could not parse total slides.');
-    totalSlides = parseInt(match[1], 10);
-    nextButton = document.getElementById('nextPageIcon');
+    const totalSlides = parseInt(match[1], 10);
+    const nextButton = document.getElementById('nextPageIcon');
     if (!nextButton) throw new Error('Next button not found.');
-    getCurrentSlideIndex = () => parseInt(currentSlideEl.textContent, 10);
-    // Go to first slide before capturing
     await goToFirstSlideDocSend();
-  }
-
-  const slideImages = [];
-  let currentSlide = getCurrentSlideIndex();
-
-  for (let i = currentSlide; i <= totalSlides; i++) {
-    // Wait for slide to render (adjust delay as needed)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Capture screenshot
-    const dataUrl = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: 'captureTab' }, (dataUrl) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve(dataUrl);
+    const slideImages = [];
+    for (let i = 0; i < totalSlides; i++) {
+      const dataUrl = await new Promise((resolve) => {
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: 'captureTab' }, (dataUrl) => {
+            resolve(dataUrl);
+          });
+        }, 1500);
       });
-    });
-
-    slideImages.push(dataUrl);
-
-    // Go to next slide if not last
-    if (i < totalSlides) {
-      nextButton.click();
+      if (dataUrl) {
+        slideImages.push(dataUrl);
+      } else {
+        console.warn('Screenshot failed, skipping this slide.');
+      }
+      if (i < totalSlides - 1) {
+        console.log('Before click, slide:', document.getElementById('page-number')?.textContent);
+        realClick(nextButton);
+        setTimeout(() => {
+          console.log('After click, slide:', document.getElementById('page-number')?.textContent);
+        }, 1000);
+      }
     }
+    return slideImages;
   }
-
-  return slideImages;
 }
 
 async function exportPresentation() {
   try {
-    // For Pitch, try to go to first slide if possible
     if (getPlatform() === 'pitch') {
       await goToFirstSlidePitch();
     }
-    // For DocSend, go to first slide is handled in captureSlides
     const slideImages = await captureSlides();
-
     const pdf = new window.jspdf.jsPDF({
       orientation: 'landscape',
       unit: 'px',
       format: [1920, 980],
     });
-
     slideImages.forEach((image, index) => {
+      if (!image) return;
       if (index > 0) {
         pdf.addPage();
       }
       pdf.addImage(image, 'PNG', 0, 0, 1920, 980);
     });
-
     pdf.save('presentation.pdf');
   } catch (err) {
     alert('Failed to export presentation: ' + err.message);

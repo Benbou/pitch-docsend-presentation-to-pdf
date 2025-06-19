@@ -29,15 +29,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleExportClick(tabId) {
     chrome.tabs.sendMessage(tabId, { action: 'exportPresentation' }, (response) => {
+      console.log('Export response:', response, chrome.runtime.lastError);
       if (chrome.runtime.lastError || !response || !response.success) {
         setStatus('EXPORT FAILED');
-        console.error(chrome.runtime.lastError || response?.error);
+        console.error('Popup error:', chrome.runtime.lastError, response?.error);
       } else {
         setStatus('EXPORT COMPLETE');
       }
     });
     setInstructionsVisible(false);
     setStatus('EXPORTING');
+  }
+
+  function isSupportedUrl(url) {
+    return url.includes('pitch.com') || url.includes('docsend.com');
   }
 
   function checkTabAndInit() {
@@ -47,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setInactiveVisible(true);
         return;
       }
-      if (tab.url.includes('pitch.com')) {
+      if (isSupportedUrl(tab.url)) {
         setInstructionsVisible(true);
         if (exportBtn) {
           exportBtn.addEventListener('click', () => handleExportClick(tab.id));
