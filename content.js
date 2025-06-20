@@ -9,6 +9,7 @@ const FIRST_SLIDE_BTN_SELECTOR = 'div.dash[data-test-id="dash-0"][idx="0"]';
 function getPlatform() {
   if (window.location.hostname.includes('pitch.com')) return 'pitch';
   if (window.location.hostname.includes('docsend.com')) return 'docsend';
+  if (window.location.hostname.includes('papermark.com')) return 'papermark';
   return null;
 }
 
@@ -62,7 +63,7 @@ function realClick(element) {
 // DocSend-adapted slide capture
 async function captureSlides() {
   const platform = getPlatform();
-  if (!platform) throw new Error('Unsupported site. Only Pitch.com and DocSend are supported.');
+  if (!platform) throw new Error('Unsupported site. Only Pitch.com, DocSend, and Papermark are supported.');
 
   if (platform === 'pitch') {
     const slideCountElement = document.querySelector('.player-v2-chrome-controls-slide-count');
@@ -121,13 +122,46 @@ async function captureSlides() {
       }
     }
     return slideImages;
+  } else if (platform === 'papermark') {
+    // Papermark slide count: <div class="flex h-8 items-center ..."><span>7</span><span class="text-gray-400">/</span><span class="text-gray-400">14</span></div>
+    const slideCountElement = document.querySelector('div.flex.h-8.items-center span:last-child');
+    if (!slideCountElement) throw new Error('Papermark slide count element not found.');
+    const totalSlides = parseInt(slideCountElement.textContent, 10);
+    const nextButton = document.querySelector('button[aria-label="Next slide"]');
+    if (!nextButton) throw new Error('Papermark next button not found.');
+    await goToFirstSlidePapermark();
+    const slideImages = [];
+    for (let i = 0; i < totalSlides; i++) {
+      const dataUrl = await new Promise((resolve) => {
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: 'captureTab' }, (dataUrl) => {
+            resolve(dataUrl);
+          });
+        }, 1200);
+      });
+      if (dataUrl) {
+        slideImages.push(dataUrl);
+      } else {
+        console.warn('Screenshot failed, skipping this slide.');
+      }
+      if (i < totalSlides - 1) {
+        nextButton.click();
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    return slideImages;
   }
 }
 
 async function exportPresentation() {
   try {
-    if (getPlatform() === 'pitch') {
+    const platform = getPlatform();
+    if (platform === 'pitch') {
       await goToFirstSlidePitch();
+    } else if (platform === 'docsend') {
+      await goToFirstSlideDocSend();
+    } else if (platform === 'papermark') {
+      await goToFirstSlidePapermark();
     }
     const slideImages = await captureSlides();
     const pdf = new window.jspdf.jsPDF({
@@ -174,6 +208,76 @@ async function goToFirstSlidePitch() {
   }
 }
 
+// Go to first slide for papermark.com
+async function goToFirstSlidePapermark() {
+  // Papermark uses a left arrow button for previous, and a slide indicator
+  const prevButton = document.querySelector('button[aria-label="Previous slide"]');
+  const slideIndicator = document.querySelector('div.flex.h-8.items-center span');
+  if (!prevButton || !slideIndicator) throw new Error('Papermark prev button or slide indicator not found.');
+  // Click prev until on first slide
+  while (parseInt(slideIndicator.textContent, 10) > 1) {
+    prevButton.click();
+    await new Promise(resolve => setTimeout(resolve, 400));
+  }
+}
+
+// --- SLIDE INFO & NAVIGATION API FOR POPUP ---
+function getSlideInfo() {
+  const platform = getPlatform();
+  if (platform === 'pitch') {
+    const slideCountElement = document.querySelector('.player-v2-chrome-controls-slide-count');
+    if (!slideCountElement) return { current: 1, total: 1 };
+    const [current, total] = slideCountElement.textContent.split(' / ').map(Number);
+    return { current, total };
+  }
+  if (platform === 'docsend') {
+    const slideCountElement = document.querySelector('.toolbar-page-indicator');
+    const currentSlideEl = document.getElementById('page-number');
+    if (!slideCountElement || !currentSlideEl) return { current: 1, total: 1 };
+    const match = slideCountElement.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+    const total = match ? parseInt(match[2], 10) : 1;
+    const current = parseInt(currentSlideEl.textContent, 10) || 1;
+    return { current, total };
+  }
+  if (platform === 'papermark') {
+    const slideIndicator = document.querySelector('div.flex.h-8.items-center span');
+    const slideCountElement = document.querySelector('div.flex.h-8.items-center span:last-child');
+    if (!slideIndicator || !slideCountElement) return { current: 1, total: 1 };
+    const current = parseInt(slideIndicator.textContent, 10) || 1;
+    const total = parseInt(slideCountElement.textContent, 10) || 1;
+    return { current, total };
+  }
+  return { current: 1, total: 1 };
+}
+
+function goToNextSlide() {
+  const platform = getPlatform();
+  if (platform === 'pitch') {
+    const nextButton = document.querySelector('.player-v2--button[aria-label="next"]');
+    if (nextButton) nextButton.click();
+  } else if (platform === 'docsend') {
+    const nextButton = document.getElementById('nextPageIcon');
+    if (nextButton) nextButton.click();
+  } else if (platform === 'papermark') {
+    const nextButton = document.querySelector('button[aria-label="Next slide"]');
+    if (nextButton) nextButton.click();
+  }
+}
+
+function goToPrevSlide() {
+  const platform = getPlatform();
+  if (platform === 'pitch') {
+    const prevButton = document.querySelector('.player-v2--button[aria-label="previous"]');
+    if (prevButton) prevButton.click();
+  } else if (platform === 'docsend') {
+    const prevButton = document.getElementById('prevPageIcon');
+    if (prevButton) prevButton.click();
+  } else if (platform === 'papermark') {
+    const prevButton = document.querySelector('button[aria-label="Previous slide"]');
+    if (prevButton) prevButton.click();
+  }
+}
+
 function init() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'exportPresentation') {
@@ -183,6 +287,20 @@ function init() {
         sendResponse({ success: false, error: err.message });
       });
       return true; // Keep the message channel open for async response
+    }
+    if (message.action === 'getSlideInfo') {
+      sendResponse(getSlideInfo());
+      return true;
+    }
+    if (message.action === 'goToNextSlide') {
+      goToNextSlide();
+      setTimeout(() => sendResponse(getSlideInfo()), 400);
+      return true;
+    }
+    if (message.action === 'goToPrevSlide') {
+      goToPrevSlide();
+      setTimeout(() => sendResponse(getSlideInfo()), 400);
+      return true;
     }
   });
 }

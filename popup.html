@@ -6,7 +6,7 @@
   </head>
   <body>
     <main>
-      <h1>Pitch.com to PDF</h1>
+      <h1>Deck to PDF</h1>
       <div id="instructions" style="display: none">
         <p class="important">
           Please navigate to the first slide of the presentation, then click
@@ -16,6 +16,19 @@
           Make sure your browser window is taking up your entire screen to
           ensure the best quality export!
         </p>
+        <div id="navigationUI" style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1rem;">
+          <button id="prevBtn" class="rounded-full bg-gray-950/50 p-1 transition-opacity duration-200 hover:bg-gray-950/75 opacity-50 group-hover:opacity-100" aria-label="Previous slide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left size-10 text-white" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          </button>
+          <div id="pagination" class="flex h-8 items-center space-x-1 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white sm:h-10 sm:px-4 sm:py-2 sm:text-sm">
+            <span id="currentPage" style="font-variant-numeric: tabular-nums;">1</span>
+            <span class="text-gray-400">/</span>
+            <span id="totalPages" class="text-gray-400" style="font-variant-numeric: tabular-nums;">?</span>
+          </div>
+          <button id="nextBtn" class="rounded-full bg-gray-950/50 p-1 transition-opacity duration-200 hover:bg-gray-950/75 opacity-50 group-hover:opacity-100" aria-label="Next slide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right size-10 text-white" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+        </div>
         <button id="exportBtn">Export</button>
       </div>
       <div id="statusMessage" style="display: none"></div>

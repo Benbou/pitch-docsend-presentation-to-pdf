@@ -11,6 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const instructions = getElementOrWarn('instructions');
   const inactiveMessage = getElementOrWarn('inactiveMessage');
   const exportBtn = getElementOrWarn('exportBtn');
+  const prevBtn = getElementOrWarn('prevBtn');
+  const nextBtn = getElementOrWarn('nextBtn');
+  const currentPageSpan = getElementOrWarn('currentPage');
+  const totalPagesSpan = getElementOrWarn('totalPages');
+
+  // Valeurs fictives pour la démo UI (à remplacer par la vraie synchro avec la page)
+  let currentPage = 1;
+  let totalPages = 14;
 
   function setStatus(text) {
     if (statusMessage) {
@@ -45,6 +53,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return url.includes('pitch.com') || url.includes('docsend.com');
   }
 
+  // Synchronisation réelle avec la page
+  function updatePaginationFromTab(tabId) {
+    chrome.tabs.sendMessage(tabId, { action: 'getSlideInfo' }, (info) => {
+      if (info && typeof info.current === 'number' && typeof info.total === 'number') {
+        currentPage = info.current;
+        totalPages = info.total;
+        updatePagination();
+      }
+    });
+  }
+
+  function goToNextSlideInTab(tabId) {
+    chrome.tabs.sendMessage(tabId, { action: 'goToNextSlide' }, (info) => {
+      if (info && typeof info.current === 'number' && typeof info.total === 'number') {
+        currentPage = info.current;
+        totalPages = info.total;
+        updatePagination();
+      }
+    });
+  }
+
+  function goToPrevSlideInTab(tabId) {
+    chrome.tabs.sendMessage(tabId, { action: 'goToPrevSlide' }, (info) => {
+      if (info && typeof info.current === 'number' && typeof info.total === 'number') {
+        currentPage = info.current;
+        totalPages = info.total;
+        updatePagination();
+      }
+    });
+  }
+
   function checkTabAndInit() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
@@ -57,12 +96,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exportBtn) {
           exportBtn.addEventListener('click', () => handleExportClick(tab.id));
         }
+        // Initialiser la pagination réelle
+        updatePaginationFromTab(tab.id);
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => goToPrevSlideInTab(tab.id));
+        }
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => goToNextSlideInTab(tab.id));
+        }
       } else {
         setInactiveVisible(true);
       }
       console.log(tab.url);
     });
   }
+
+  function updatePagination() {
+    if (currentPageSpan) currentPageSpan.textContent = currentPage;
+    if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  // Initialiser la pagination à l'ouverture
+  updatePagination();
 
   checkTabAndInit();
 });
